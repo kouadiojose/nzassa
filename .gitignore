@@ -44,3 +44,6 @@ apps/mobile/android/.gradle/
 # Uploads / storage local
 storage/
 apps/backend/storage/
+
+# Redis snapshots locaux
+dump.rdb
