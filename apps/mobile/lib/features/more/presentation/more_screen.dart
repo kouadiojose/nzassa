@@ -100,11 +100,19 @@ class MoreScreen extends ConsumerWidget {
                 subtitle: 'Suivre, encaisser et relancer',
                 onTap: () => context.push('/debts'),
               ),
-              const _MenuTile(
+              _MenuTile(
                 icon: Icons.calendar_month_outlined,
                 color: NzColors.primary,
                 title: 'Rendez-vous',
-                subtitle: 'Disponible sur la plateforme web',
+                subtitle: 'Agenda, confirmations, suivi',
+                onTap: () => context.push('/appointments'),
+              ),
+              _MenuTile(
+                icon: Icons.notifications_none,
+                color: NzColors.info,
+                title: 'Notifications',
+                subtitle: 'Alertes stock, dettes, activité',
+                onTap: () => context.push('/notifications'),
               ),
               const _MenuTile(
                 icon: Icons.bar_chart_outlined,

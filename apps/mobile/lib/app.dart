@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/presentation/auth_providers.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/appointments/presentation/appointments_screen.dart';
 import 'features/customers/presentation/customers_screen.dart';
 import 'features/debts/presentation/debts_screen.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/more/presentation/more_screen.dart';
+import 'features/notifications/presentation/notifications_screen.dart';
 import 'features/products/presentation/products_screen.dart';
 import 'features/sales/presentation/pos_screen.dart';
 import 'features/sales/presentation/sales_list_screen.dart';
@@ -29,6 +31,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/pos', builder: (context, state) => const PosScreen()),
       GoRoute(path: '/debts', builder: (context, state) => const DebtsScreen()),
+      GoRoute(
+          path: '/appointments',
+          builder: (context, state) => const AppointmentsScreen()),
+      GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationsScreen()),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [

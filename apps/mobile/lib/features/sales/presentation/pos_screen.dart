@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/format.dart';
 import '../../../core/theme.dart';
+import '../../customers/presentation/customers_screen.dart';
 import '../../products/data/product.dart';
 import '../data/cart.dart';
 import 'barcode_scanner_page.dart';
@@ -30,6 +31,42 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   String _search = '';
   String _paymentMethod = 'cash';
   bool _saving = false;
+  String? _customerId;
+  String? _customerName;
+  final TextEditingController _amountController = TextEditingController();
+  bool _amountEdited = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  /// Montant reçu saisi (défaut : total du panier).
+  Decimal _amountPaid(Cart cart) {
+    if (!_amountEdited || _amountController.text.trim().isEmpty) return cart.total;
+    final raw = _amountController.text.trim().replaceAll(' ', '').replaceAll(',', '.');
+    return Decimal.tryParse(raw) ?? cart.total;
+  }
+
+  Future<void> _pickCustomer() async {
+    final customers = await ref.read(customersProvider.future);
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<Map<String, String?>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (context) => _CustomerPickerSheet(customers: customers),
+    );
+    if (selected == null) return;
+    setState(() {
+      _customerId = selected['id'];
+      _customerName = selected['name'];
+    });
+  }
 
   Future<void> _scanBarcode() async {
     final code = await Navigator.of(context).push<String>(
@@ -62,15 +99,34 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     try {
       final branches = await ref.read(branchesProvider.future);
       if (branches.isEmpty || !mounted) return;
+      final amountPaid = _amountPaid(cart);
+      if (amountPaid > cart.total) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Le montant reçu dépasse le total')),
+        );
+        return;
+      }
+      if (amountPaid < cart.total && _customerId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Paiement partiel : sélectionnez un client pour le crédit'),
+          ),
+        );
+        return;
+      }
       final repository = await ref.read(salesRepositoryProvider.future);
       final result = await repository.createSale(
         cart: cart,
         branchId: branches.first['id'] as String,
+        customerId: _customerId,
         paymentMethod: _paymentMethod,
-        amountPaid: cart.total,
+        amountPaid: amountPaid,
       );
       if (!mounted) return;
       ref.read(cartProvider.notifier).clear();
+      _amountController.clear();
+      _amountEdited = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -175,6 +231,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             cart: cart,
             paymentMethod: _paymentMethod,
             saving: _saving,
+            customerName: _customerName,
+            amountController: _amountController,
+            onAmountEdited: () => _amountEdited = true,
+            onPickCustomer: _pickCustomer,
+            onClearCustomer: () =>
+                setState(() => _customerId = _customerName = null),
             onMethodChanged: (method) => setState(() => _paymentMethod = method),
             onCheckout: () => _checkout(cart),
           ),
@@ -265,6 +327,11 @@ class _CartPanel extends ConsumerWidget {
     required this.cart,
     required this.paymentMethod,
     required this.saving,
+    required this.customerName,
+    required this.amountController,
+    required this.onAmountEdited,
+    required this.onPickCustomer,
+    required this.onClearCustomer,
     required this.onMethodChanged,
     required this.onCheckout,
   });
@@ -272,6 +339,11 @@ class _CartPanel extends ConsumerWidget {
   final Cart cart;
   final String paymentMethod;
   final bool saving;
+  final String? customerName;
+  final TextEditingController amountController;
+  final VoidCallback onAmountEdited;
+  final VoidCallback onPickCustomer;
+  final VoidCallback onClearCustomer;
   final ValueChanged<String> onMethodChanged;
   final VoidCallback onCheckout;
 
@@ -367,6 +439,73 @@ class _CartPanel extends ConsumerWidget {
                       ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 8),
+              // Client + montant reçu (paiement partiel = vente à crédit)
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: onPickCustomer,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: NzColors.sand,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person_outline,
+                                size: 18, color: NzColors.muted),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                customerName ?? 'Client (facultatif)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: customerName != null
+                                      ? NzColors.ink
+                                      : NzColors.muted,
+                                ),
+                              ),
+                            ),
+                            if (customerName != null)
+                              GestureDetector(
+                                onTap: onClearCustomer,
+                                child: const Icon(Icons.close,
+                                    size: 16, color: NzColors.muted),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 130,
+                    child: TextField(
+                      controller: amountController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.end,
+                      onChanged: (_) => onAmountEdited(),
+                      decoration: InputDecoration(
+                        labelText: 'Reçu',
+                        hintText: formatAmount(cart.total),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 10),
+                      ),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               // Moyens de paiement
@@ -465,6 +604,76 @@ class _QtyButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 16, color: NzColors.ink),
+      ),
+    );
+  }
+}
+
+
+class _CustomerPickerSheet extends StatefulWidget {
+  const _CustomerPickerSheet({required this.customers});
+
+  final List<Map<String, dynamic>> customers;
+
+  @override
+  State<_CustomerPickerSheet> createState() => _CustomerPickerSheetState();
+}
+
+class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.customers.where((c) {
+      final name = '${c['first_name'] ?? ''} ${c['last_name'] ?? ''}'.toLowerCase();
+      final phone = (c['phone'] as String?) ?? '';
+      return _query.isEmpty || name.contains(_query) || phone.contains(_query);
+    }).toList();
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.65,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: TextField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Rechercher un client (nom, téléphone)…',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (value) => setState(() => _query = value.toLowerCase()),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_off_outlined, color: NzColors.muted),
+              title: const Text('Aucun client'),
+              onTap: () => Navigator.of(context).pop({'id': null, 'name': null}),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final customer = filtered[index];
+                  final name =
+                      '${customer['first_name'] ?? ''} ${customer['last_name'] ?? ''}'
+                          .trim();
+                  return ListTile(
+                    leading: NzAvatar(label: name, size: 38),
+                    title: Text(name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text((customer['phone'] as String?) ?? '',
+                        style: const TextStyle(fontSize: 12)),
+                    onTap: () => Navigator.of(context)
+                        .pop({'id': customer['id'] as String, 'name': name}),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
