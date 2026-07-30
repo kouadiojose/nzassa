@@ -7,7 +7,7 @@ DOIVENT filtrer leurs requêtes par ce tenant_id.
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -91,7 +91,7 @@ Ctx = Annotated[CurrentContext, Depends(get_current_context)]
 Db = Annotated[AsyncSession, Depends(get_db)]
 
 
-def require_permissions(*required: str) -> object:
+def require_permissions(*required: str) -> Any:
     """Guard de permissions : `dependencies=[require_permissions("sales.create")]`."""
 
     async def checker(ctx: Ctx) -> CurrentContext:
@@ -103,7 +103,7 @@ def require_permissions(*required: str) -> object:
     return Depends(checker)
 
 
-def require_superadmin() -> object:
+def require_superadmin() -> Any:
     async def checker(ctx: Ctx) -> CurrentContext:
         if not ctx.is_superadmin:
             raise PermissionDeniedError("Réservé au Super Admin")
