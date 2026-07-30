@@ -81,6 +81,10 @@ async def invite_member(payload: InviteUserRequest, db: Db, ctx: Ctx) -> dict[st
     if existing:
         raise ConflictError("Un compte existe déjà avec cet email")
 
+    from nzassa.modules.subscriptions.service import enforce_limit
+
+    await enforce_limit(db, tenant_id, "max_users")
+
     business = (await db.execute(tenant_query(Business, tenant_id).limit(1))).scalars().first()
     if business is None:
         raise NotFoundError("Entreprise introuvable")

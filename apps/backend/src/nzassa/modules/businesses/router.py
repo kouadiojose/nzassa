@@ -80,6 +80,9 @@ async def create_branch(payload: BranchCreate, db: Db, ctx: Ctx) -> dict[str, An
     ).first()
     if duplicate:
         raise ConflictError("Un point de vente avec ce code existe déjà")
+    from nzassa.modules.subscriptions.service import enforce_limit
+
+    await enforce_limit(db, tenant_id, "max_branches")
     branch = Branch(
         tenant_id=tenant_id,
         business_id=business.id,

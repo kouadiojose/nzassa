@@ -197,6 +197,9 @@ async def list_products(
 async def create_product(payload: ProductCreate, db: Db, ctx: Ctx) -> dict[str, Any]:
     tenant_id = ctx.require_tenant()
     business = await get_current_business(db, ctx)
+    from nzassa.modules.subscriptions.service import enforce_limit
+
+    await enforce_limit(db, tenant_id, "max_products")
     await _check_product_uniqueness(db, tenant_id, payload.sku, payload.barcode)
     data = payload.model_dump()
     if not data.get("sku"):
