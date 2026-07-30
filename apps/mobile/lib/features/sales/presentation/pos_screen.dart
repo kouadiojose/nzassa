@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/format.dart';
 import '../../../core/theme.dart';
+import '../../products/data/product.dart';
 import '../data/cart.dart';
+import 'barcode_scanner_page.dart';
 import 'sales_providers.dart';
 
 const _paymentMethods = {
@@ -28,6 +30,32 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   String _search = '';
   String _paymentMethod = 'cash';
   bool _saving = false;
+
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const BarcodeScannerPage()),
+    );
+    if (code == null || !mounted) return;
+    final products = await ref.read(productsProvider.future);
+    Product? match;
+    for (final product in products) {
+      if (product.barcode == code || product.sku == code) {
+        match = product;
+        break;
+      }
+    }
+    if (!mounted) return;
+    if (match != null) {
+      ref.read(cartProvider.notifier).add(match);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${match.name} ajouté au panier')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Aucun produit avec le code $code')),
+      );
+    }
+  }
 
   Future<void> _checkout(Cart cart) async {
     setState(() => _saving = true);
@@ -83,9 +111,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Rechercher ou scanner un produit…',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner, color: NzColors.primaryDark),
+                  tooltip: 'Scanner un code-barres',
+                  onPressed: _scanBarcode,
+                ),
               ),
               onChanged: (value) => setState(() => _search = value.toLowerCase()),
             ),

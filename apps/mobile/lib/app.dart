@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/presentation/auth_providers.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/customers/presentation/customers_screen.dart';
+import 'features/debts/presentation/debts_screen.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/more/presentation/more_screen.dart';
 import 'features/products/presentation/products_screen.dart';
@@ -27,6 +28,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/pos', builder: (context, state) => const PosScreen()),
+      GoRoute(path: '/debts', builder: (context, state) => const DebtsScreen()),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [

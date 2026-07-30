@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../auth/presentation/auth_providers.dart';
@@ -90,24 +91,25 @@ class MoreScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const _MenuCard(
+          _MenuCard(
             children: [
               _MenuTile(
+                icon: Icons.hourglass_bottom,
+                color: NzColors.gold,
+                title: 'Créances clients',
+                subtitle: 'Suivre, encaisser et relancer',
+                onTap: () => context.push('/debts'),
+              ),
+              const _MenuTile(
                 icon: Icons.calendar_month_outlined,
                 color: NzColors.primary,
                 title: 'Rendez-vous',
                 subtitle: 'Disponible sur la plateforme web',
               ),
-              _MenuTile(
+              const _MenuTile(
                 icon: Icons.bar_chart_outlined,
                 color: NzColors.success,
                 title: 'Rapports détaillés',
-                subtitle: 'Disponible sur la plateforme web',
-              ),
-              _MenuTile(
-                icon: Icons.hourglass_bottom,
-                color: NzColors.gold,
-                title: 'Créances clients',
                 subtitle: 'Disponible sur la plateforme web',
               ),
             ],

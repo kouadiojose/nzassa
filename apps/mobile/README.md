@@ -23,6 +23,10 @@ Sur Android en HTTP local, autorisez le trafic clair dans
 `android/app/src/main/AndroidManifest.xml` :
 `<application android:usesCleartextTraffic="true" …>`.
 
+Pour le scan de code-barres sur iOS, ajoutez dans `ios/Runner/Info.plist` :
+`<key>NSCameraUsageDescription</key><string>Scanner les codes-barres produits</string>`
+(la permission caméra Android est déclarée automatiquement par mobile_scanner).
+
 ## Architecture
 
 - `lib/core/` : client API (Dio + refresh token), stockage sécurisé,
