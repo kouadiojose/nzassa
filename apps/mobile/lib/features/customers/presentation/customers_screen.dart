@@ -6,11 +6,12 @@ import '../../sales/presentation/sales_providers.dart';
 
 final customersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final api = ref.watch(apiClientProvider);
-  final db = await ref.watch(localDbProvider.future);
   try {
     final data = await api.get<List<dynamic>>('/customers', query: {'per_page': 100});
     return data.cast<Map<String, dynamic>>();
   } catch (_) {
+    final db = await ref.watch(localDbProvider.future);
+    if (db == null) rethrow;
     final rows = await db.db.query('cached_customers', where: 'is_active = 1');
     return rows
         .map((row) => {
@@ -69,9 +70,16 @@ class CustomersScreen extends ConsumerWidget {
     try {
       await api.post<Map<String, dynamic>>('/customers', body: payload);
     } catch (_) {
-      // Hors ligne : la création rejoindra la file de synchronisation.
+      // Hors ligne : la création rejoint la file de synchronisation (mobile).
       final sync = await ref.read(syncServiceProvider.future);
-      await sync.enqueue('create_customer', payload);
+      if (sync != null) {
+        await sync.enqueue('create_customer', payload);
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connexion impossible — réessayez en ligne')),
+        );
+        return;
+      }
     }
     ref.invalidate(customersProvider);
   }

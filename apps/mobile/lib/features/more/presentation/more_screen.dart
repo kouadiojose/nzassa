@@ -31,6 +31,16 @@ class MoreScreen extends ConsumerWidget {
             ),
             onTap: () async {
               final sync = await ref.read(syncServiceProvider.future);
+              if (sync == null) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Mode hors ligne indisponible sur le web'),
+                    ),
+                  );
+                }
+                return;
+              }
               final applied = await sync.pushPending();
               await sync.pullChanges();
               ref.invalidate(pendingSyncCountProvider);

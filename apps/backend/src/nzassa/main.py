@@ -47,9 +47,16 @@ def create_app() -> FastAPI:
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
+    # En développement, Flutter Web (flutter run -d chrome) utilise un port
+    # aléatoire : on autorise tous les ports de localhost. En production, la
+    # liste CORS_ORIGINS reste strictement respectée.
+    dev_origin_regex = (
+        r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$" if not settings.is_production else None
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
+        allow_origin_regex=dev_origin_regex,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Correlation-ID", "Idempotency-Key"],

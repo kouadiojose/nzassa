@@ -18,10 +18,13 @@ class SalesRepository {
   SalesRepository(this._api, this._sync);
 
   final ApiClient _api;
-  final SyncService _sync;
+
+  /// Nulle quand la file offline n'est pas disponible (Flutter Web) :
+  /// les erreurs réseau sont alors remontées à l'utilisateur.
+  final SyncService? _sync;
 
   /// Tente la création en ligne ; en cas d'échec réseau, enfile l'opération
-  /// dans la file de synchronisation locale (offline-first).
+  /// dans la file de synchronisation locale (offline-first, mobile uniquement).
   Future<SaleResult> createSale({
     required Cart cart,
     required String branchId,
@@ -39,8 +42,9 @@ class SalesRepository {
       final data = await _api.post<Map<String, dynamic>>('/sales', body: payload);
       return SaleResult.online(data['number'] as String);
     } on ApiException catch (error) {
-      if (error.code == 'NETWORK_ERROR') {
-        await _sync.enqueue('create_sale', payload);
+      final sync = _sync;
+      if (error.code == 'NETWORK_ERROR' && sync != null) {
+        await sync.enqueue('create_sale', payload);
         return const SaleResult.offline();
       }
       rethrow;

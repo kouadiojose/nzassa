@@ -46,8 +46,10 @@ class HomeScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(dashboardProvider);
           final sync = await ref.read(syncServiceProvider.future);
-          await sync.pushPending();
-          await sync.pullChanges();
+          if (sync != null) {
+            await sync.pushPending();
+            await sync.pullChanges();
+          }
           ref.invalidate(pendingSyncCountProvider);
         },
         child: dashboard.when(
