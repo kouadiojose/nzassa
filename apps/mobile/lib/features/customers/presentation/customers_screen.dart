@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../sales/presentation/sales_providers.dart';
 
@@ -30,34 +31,50 @@ class CustomersScreen extends ConsumerWidget {
   Future<void> _createCustomer(BuildContext context, WidgetRef ref) async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Nouveau client'),
-        content: Column(
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Text(
+              'Nouveau client',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: NzColors.ink),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Prénom'),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Prénom',
+                prefixIcon: Icon(Icons.person_outline, size: 20),
+              ),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Téléphone (+225…)'),
+              decoration: const InputDecoration(
+                labelText: 'Téléphone (+225…)',
+                prefixIcon: Icon(Icons.phone_outlined, size: 20),
+              ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Créer le client'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Créer'),
-          ),
-        ],
       ),
     );
     if (confirmed != true || nameController.text.trim().isEmpty) return;
@@ -91,28 +108,65 @@ class CustomersScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Clients'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_alt),
-            onPressed: () => _createCustomer(context, ref),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: IconButton.filledTonal(
+              icon: const Icon(Icons.person_add_alt),
+              onPressed: () => _createCustomer(context, ref),
+            ),
           ),
         ],
       ),
       body: customers.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('$error')),
-        data: (items) => ListView.separated(
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final customer = items[index];
-            final name =
-                '${customer['first_name'] ?? ''} ${customer['last_name'] ?? ''}'.trim();
-            return ListTile(
-              leading: CircleAvatar(child: Text(name.isEmpty ? '?' : name[0])),
-              title: Text(name),
-              subtitle: Text(customer['phone'] as String? ?? ''),
-            );
-          },
+        error: (error, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('$error', textAlign: TextAlign.center),
+          ),
+        ),
+        data: (items) => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(customersProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final customer = items[index];
+              final name =
+                  '${customer['first_name'] ?? ''} ${customer['last_name'] ?? ''}'.trim();
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      NzAvatar(label: name),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, color: NzColors.ink),
+                            ),
+                            if ((customer['phone'] as String?) != null)
+                              Text(
+                                customer['phone'] as String,
+                                style: const TextStyle(
+                                    fontSize: 12.5, color: NzColors.muted),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: NzColors.muted),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

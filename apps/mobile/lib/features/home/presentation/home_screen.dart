@@ -1,11 +1,12 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/format.dart';
+import '../../../core/theme.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../sales/presentation/sales_providers.dart';
-
-final _numberFormat = NumberFormat.decimalPattern('fr');
 
 final dashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final api = ref.watch(apiClientProvider);
@@ -15,6 +16,16 @@ final dashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.invalidate(dashboardProvider);
+    final sync = await ref.read(syncServiceProvider.future);
+    if (sync != null) {
+      await sync.pushPending();
+      await sync.pullChanges();
+    }
+    ref.invalidate(pendingSyncCountProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
@@ -22,106 +33,366 @@ class HomeScreen extends ConsumerWidget {
     final auth = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Bonjour ${auth.user?.firstName ?? ''} 👋'),
-        actions: [
-          pendingSync.maybeWhen(
-            data: (count) => count > 0
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Chip(
-                      avatar: const Icon(Icons.sync_problem, size: 16),
-                      label: Text('$count en attente'),
-                    ),
-                  )
-                : const Padding(
-                    padding: EdgeInsets.only(right: 12),
-                    child: Icon(Icons.cloud_done_outlined),
-                  ),
-            orElse: () => const SizedBox.shrink(),
-          ),
-        ],
-      ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(dashboardProvider);
-          final sync = await ref.read(syncServiceProvider.future);
-          if (sync != null) {
-            await sync.pushPending();
-            await sync.pullChanges();
-          }
-          ref.invalidate(pendingSyncCountProvider);
-        },
-        child: dashboard.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => ListView(
-            children: [
-              const SizedBox(height: 80),
-              const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
-              const SizedBox(height: 8),
-              Center(child: Text('Hors connexion — $error')),
-              const Center(
-                child: Text('Vous pouvez continuer à vendre, tout sera synchronisé.'),
+        onRefresh: () => _refresh(ref),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _HeroHeader(
+                firstName: auth.user?.firstName ?? '',
+                pendingCount: pendingSync.maybeWhen(data: (c) => c, orElse: () => 0),
+                revenue: dashboard.maybeWhen(
+                  data: (d) => formatMoney(Decimal.parse(d['revenue'] as String)),
+                  orElse: () => '— —',
+                ),
+                salesCount: dashboard.maybeWhen(
+                  data: (d) => d['sales_count'] as int,
+                  orElse: () => 0,
+                ),
               ),
-            ],
-          ),
-          data: (data) => ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _KpiCard(
-                title: "Chiffre d'affaires (30 j)",
-                value: '${_numberFormat.format(num.parse(data['revenue'] as String))} F',
-                subtitle: '${data['sales_count']} ventes',
-                color: const Color(0xFFD1621C),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
+              sliver: SliverToBoxAdapter(
+                child: dashboard.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.only(top: 60),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => const _OfflineNotice(),
+                  data: (data) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _SectionTitle('Aperçu des 30 derniers jours'),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _KpiTile(
+                              icon: Icons.trending_up,
+                              color: NzColors.success,
+                              label: 'Bénéfice estimé',
+                              value: formatMoney(
+                                  Decimal.parse(data['estimated_profit'] as String)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _KpiTile(
+                              icon: Icons.receipt_long,
+                              color: NzColors.info,
+                              label: 'Dépenses',
+                              value:
+                                  formatMoney(Decimal.parse(data['expenses'] as String)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _KpiTile(
+                              icon: Icons.hourglass_bottom,
+                              color: NzColors.gold,
+                              label: 'Créances clients',
+                              value: formatMoney(
+                                  Decimal.parse(data['open_debts'] as String)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _KpiTile(
+                              icon: Icons.inventory_2_outlined,
+                              color: (data['low_stock_count'] as int) > 0
+                                  ? NzColors.danger
+                                  : NzColors.muted,
+                              label: 'Stock faible',
+                              value: '${data['low_stock_count']} produit(s)',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      const _SectionTitle('Actions rapides'),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _QuickAction(
+                            icon: Icons.point_of_sale,
+                            label: 'Vendre',
+                            onTap: () => context.push('/pos'),
+                          ),
+                          _QuickAction(
+                            icon: Icons.person_add_alt,
+                            label: 'Client',
+                            onTap: () => context.go('/customers'),
+                          ),
+                          _QuickAction(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Stock',
+                            onTap: () => context.go('/products'),
+                          ),
+                          _QuickAction(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Ventes',
+                            onTap: () => context.go('/sales'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _KpiCard(
-                title: 'Bénéfice estimé',
-                value:
-                    '${_numberFormat.format(num.parse(data['estimated_profit'] as String))} F',
-                color: Colors.green.shade700,
-              ),
-              _KpiCard(
-                title: 'Créances clients',
-                value: '${_numberFormat.format(num.parse(data['open_debts'] as String))} F',
-                color: Colors.amber.shade800,
-              ),
-              _KpiCard(
-                title: 'Stock faible',
-                value: '${data['low_stock_count']} produit(s)',
-                color: (data['low_stock_count'] as int) > 0 ? Colors.red : Colors.grey,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({required this.title, required this.value, this.subtitle, required this.color});
+class _HeroHeader extends StatelessWidget {
+  const _HeroHeader({
+    required this.firstName,
+    required this.pendingCount,
+    required this.revenue,
+    required this.salesCount,
+  });
+
+  final String firstName;
+  final int pendingCount;
+  final String revenue;
+  final int salesCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: NzColors.heroGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bonjour $firstName 👋',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Prêt·e à vendre aujourd’hui ?',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      pendingCount > 0 ? Icons.cloud_upload : Icons.cloud_done,
+                      color: pendingCount > 0 ? NzColors.gold : Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      pendingCount > 0 ? '$pendingCount à sync' : 'À jour',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text(
+            "CHIFFRE D'AFFAIRES (30 J)",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            revenue,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$salesCount vente(s) enregistrée(s)',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
 
   final String title;
-  final String value;
-  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        color: NzColors.ink,
+      ),
+    );
+  }
+}
+
+class _KpiTile extends StatelessWidget {
+  const _KpiTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
   final Color color;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
-            if (subtitle != null) Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 10),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: NzColors.ink,
+                ),
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: NzColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: NzColors.ink.withOpacity(0.06)),
+              ),
+              child: Icon(icon, color: NzColors.primaryDark),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: NzColors.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineNotice extends StatelessWidget {
+  const _OfflineNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(Icons.cloud_off, size: 42, color: NzColors.muted),
+            SizedBox(height: 10),
+            Text(
+              'Hors connexion',
+              style: TextStyle(fontWeight: FontWeight.w800, color: NzColors.ink),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Vous pouvez continuer à vendre : tout sera synchronisé au retour du réseau.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: NzColors.muted, fontSize: 13),
+            ),
           ],
         ),
       ),

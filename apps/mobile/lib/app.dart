@@ -10,6 +10,7 @@ import 'features/more/presentation/more_screen.dart';
 import 'features/products/presentation/products_screen.dart';
 import 'features/sales/presentation/pos_screen.dart';
 import 'features/sales/presentation/sales_list_screen.dart';
+import 'core/theme.dart';
 import 'shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -49,10 +50,7 @@ class NzassaApp extends ConsumerWidget {
     return MaterialApp.router(
       title: "N'Zassa Business",
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD1621C)),
-      ),
+      theme: buildNzassaTheme(),
       routerConfig: router,
     );
   }

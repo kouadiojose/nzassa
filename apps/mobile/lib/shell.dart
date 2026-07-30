@@ -20,10 +20,14 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: child,
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/pos'),
         tooltip: 'Nouvelle vente',
-        child: const Icon(Icons.point_of_sale),
+        icon: const Icon(Icons.point_of_sale),
+        label: const Text(
+          'Vendre',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex(context),
