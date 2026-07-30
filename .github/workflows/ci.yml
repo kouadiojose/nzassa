@@ -62,7 +62,7 @@ jobs:
         run: npm run build
       - name: Tests
         working-directory: apps/web
-        run: npm test -- --watch=false --browsers=ChromeHeadless
+        run: npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox
 
   mobile:
     runs-on: ubuntu-latest

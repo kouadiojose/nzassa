@@ -1,0 +1,29 @@
+@import 'primeng/resources/themes/lara-light-amber/theme.css';
+@import 'primeng/resources/primeng.css';
+@import 'primeicons/primeicons.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-50 text-gray-900;
+  margin: 0;
+  font-family: Inter, 'Segoe UI', Roboto, sans-serif;
+}
+
+.nz-card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-5;
+}
+
+.nz-btn-primary {
+  @apply bg-nzassa-600 hover:bg-nzassa-700 text-white font-medium rounded-lg px-4 py-2 transition;
+}
+
+.nz-input {
+  @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nzassa-500;
+}
+
+.nz-label {
+  @apply block text-sm font-medium text-gray-700 mb-1;
+}

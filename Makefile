@@ -43,7 +43,7 @@ web-dev: ## Démarre le serveur de dev Angular
 	cd apps/web && npm start
 
 web-test: ## Tests Angular
-	cd apps/web && npm test -- --watch=false --browsers=ChromeHeadless
+	cd apps/web && npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox
 
 web-build: ## Build de production Angular
 	cd apps/web && npm run build
