@@ -140,6 +140,9 @@ async def register_tenant(db: AsyncSession, payload: RegisterRequest) -> tuple[T
         )
 
     # Essai gratuit sur le plan Essentiel
+    from nzassa.modules.subscriptions.service import seed_plans
+
+    await seed_plans(db)
     plan = (
         await db.execute(select(SubscriptionPlan).where(SubscriptionPlan.code == "essential"))
     ).scalar_one_or_none()

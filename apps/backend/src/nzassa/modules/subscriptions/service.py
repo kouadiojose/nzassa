@@ -97,9 +97,7 @@ async def enforce_limit(
         return
     current = (
         await db.execute(
-            select(func.count())
-            .select_from(model)
-            .where(model.tenant_id == tenant_id)  # type: ignore[attr-defined]
+            select(func.count()).select_from(model).where(model.tenant_id == tenant_id)  # type: ignore[attr-defined]
         )
     ).scalar_one()
     if current + adding > maximum:
