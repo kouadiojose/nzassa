@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+dist/
+build/
+
+# Node / Angular
+node_modules/
+.angular/
+apps/web/dist/
+npm-debug.log*
+
+# Flutter / Dart
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins*
+apps/mobile/.packages
+apps/mobile/ios/Pods/
+apps/mobile/android/.gradle/
+*.g.dart.tmp
+
+# Env & secrets
+.env
+.env.local
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Uploads / storage local
+storage/
+apps/backend/storage/

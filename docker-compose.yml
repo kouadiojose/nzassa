@@ -1,0 +1,84 @@
+name: nzassa-business
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nzassa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nzassa_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-nzassa}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nzassa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: apps/backend
+      dockerfile: ../../infrastructure/docker/backend.Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nzassa:nzassa_dev@postgres:5432/nzassa
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: apps/backend
+      dockerfile: ../../infrastructure/docker/backend.Dockerfile
+    command: ["python", "-m", "dramatiq", "nzassa.core.tasks", "--processes", "1", "--threads", "4"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nzassa:nzassa_dev@postgres:5432/nzassa
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: apps/web
+      dockerfile: ../../infrastructure/docker/web.Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - web
+
+volumes:
+  pgdata:
